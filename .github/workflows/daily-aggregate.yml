@@ -1,0 +1,47 @@
+# Aggregates Wyoming-located listings from every taildraggers.com
+# manufacturer scraper site once a day.
+name: Daily Wyoming Listings Aggregate
+
+on:
+  schedule:
+    # 30 minutes after the manufacturer repos' own 13:00 UTC daily runs,
+    # so this picks up same-day updates rather than yesterday's pages.
+    - cron: "30 13 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-aggregate
+  cancel-in-progress: false
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run aggregator
+        run: python main.py
+
+      - name: Commit and push updated listings
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update Wyoming listings ($(date -u +'%Y-%m-%d'))"
+            git push
+          fi
